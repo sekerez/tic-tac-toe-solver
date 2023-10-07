@@ -1,5 +1,4 @@
 use anyhow::Result;
-use itertools::{iproduct, Itertools};
 use rand::Rng;
 
 use std::fmt;
@@ -8,52 +7,125 @@ use strum_macros;
 
 fn main() {
     let mut game = Game::new().unwrap();
-    for i in 0..9 {
+    for _ in 0..9 {
         println!("State of the board: \n{}", game.board);
-        game.play_board_move(i).unwrap();
+        game.play_board_move().unwrap();
         if let Some(player) = game.winner() {
-            println!("{player} won!");
+            println!("{player} won!\n{}", game.board);
             return;
         }
     }
-    println!("The game ended in a tie!")
+    println!("The game ended in a tie!\n{}", game.board);
 }
 
-#[derive(PartialEq, Eq, Clone, Copy, Debug, strum_macros::Display)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 enum Piece {
     Blank,
     Circle,
     Cross,
 }
+impl Piece {
+    pub fn opposite(self) -> Self {
+        use Piece as P;
+        match self {
+            P::Blank => P::Blank,
+            P::Circle => P::Cross,
+            P::Cross => P::Circle,
+        }
+    }
+}
+impl fmt::Display for Piece {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Piece as P;
+        let symbol = match self {
+            P::Blank => ' ',
+            P::Circle => 'O',
+            P::Cross => 'X',
+        };
+        write!(f, "{}", symbol)
+    }
+}
 
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+struct Coord(usize, usize);
+impl Coord {
+    pub fn out_of_bounds(self) -> Result<(), String> {
+        if self.0 > 2 || self.1 > 2 {
+            return Err(format!(
+                "The following coordinates are out of bounds: {} {}",
+                self.0, self.1
+            )
+            .to_string());
+        }
+        Ok(())
+    }
+    pub fn flat_ind(self) -> usize {
+        self.0 * 3 + self.1
+    }
+}
 #[derive(Clone)]
 struct Board([Piece; 9]);
 impl Board {
     pub fn new() -> Self {
         Self([Piece::Blank; 9])
     }
+    fn get(&self, coord: Coord) -> Result<Piece, String> {
+        coord.out_of_bounds()?;
+        Ok(self.0[coord.flat_ind()])
+    }
+    fn set(&mut self, coord: Coord, piece: Piece) -> Result<(), String> {
+        use Piece as P;
+
+        coord.out_of_bounds()?;
+        match self.get(coord)? {
+            P::Circle | P::Cross => Err("Piece already present".to_string()),
+            P::Blank => {
+                self.0[coord.flat_ind()] = piece;
+                Ok(())
+            }
+        }
+    }
+    fn set_to_blank(&mut self, coord: Coord) -> Result<(), String> {
+        coord.out_of_bounds()?;
+        self.0[coord.flat_ind()] = Piece::Blank;
+        Ok(())
+    }
+    fn used_cells(&self) -> usize {
+        self.0.iter().filter(|&&p| p != Piece::Blank).count()
+    }
 }
 impl fmt::Display for Board {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{:?}\n{:?}\n{:?}\n",
-            &self.0[..3],
-            &self.0[3..6],
-            &self.0[6..]
-        )
+        let formatted = self
+            .0
+            .chunks(3)
+            .map(|chunk| format!("{}|{}|{}", chunk[0], chunk[1], chunk[2]))
+            .collect::<Vec<_>>()
+            .join("\n");
+        write!(f, "{}\n", formatted)
     }
 }
 
-static SEQUENCES: [[(usize, usize); 3]; 8] = [
-    [(0, 0), (1, 0), (2, 0)],
-    [(0, 1), (1, 1), (2, 1)],
-    [(0, 2), (1, 2), (2, 2)], // Verticals
-    [(0, 0), (0, 1), (0, 2)],
-    [(1, 0), (1, 1), (1, 2)],
-    [(2, 0), (2, 1), (2, 2)], // Horizontals
-    [(0, 0), (1, 1), (2, 2)],
-    [(0, 2), (1, 1), (2, 0)], // Diagonals
+static CELLS: [Coord; 9] = [
+    Coord(0, 0),
+    Coord(0, 1),
+    Coord(0, 2),
+    Coord(1, 0),
+    Coord(1, 1),
+    Coord(1, 2),
+    Coord(2, 0),
+    Coord(2, 1),
+    Coord(2, 2),
+];
+static SEQUENCES: [[Coord; 3]; 8] = [
+    [Coord(0, 0), Coord(1, 0), Coord(2, 0)],
+    [Coord(0, 1), Coord(1, 1), Coord(2, 1)],
+    [Coord(0, 2), Coord(1, 2), Coord(2, 2)], // Verticals
+    [Coord(0, 0), Coord(0, 1), Coord(0, 2)],
+    [Coord(1, 0), Coord(1, 1), Coord(1, 2)],
+    [Coord(2, 0), Coord(2, 1), Coord(2, 2)], // Horizontals
+    [Coord(0, 0), Coord(1, 1), Coord(2, 2)],
+    [Coord(0, 2), Coord(1, 1), Coord(2, 0)], // Diagonals
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, strum_macros::Display)]
@@ -67,6 +139,17 @@ enum Outcome {
     Win,
     Tie,
     Loss,
+}
+
+impl Outcome {
+    pub fn opposite(self) -> Self {
+        use Outcome as O;
+        match self {
+            O::Win => O::Loss,
+            O::Tie => O::Tie,
+            O::Loss => O::Win,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -110,29 +193,35 @@ impl Game {
             ],
         })
     }
-    pub fn play_board_move(&mut self, turn: usize) -> Result<(), String> {
-        let current_player = self.current_player(turn);
-        let (x, y) = self.calculate_move(current_player)?;
-        self.set(x, y, current_player.piece)?;
+    pub fn play_board_move(&mut self) -> Result<(), String> {
+        let current_player = self.current_player();
+        let coord = self.calculate_move(current_player)?;
+        self.board.set(coord, current_player.piece)?;
         Ok(())
     }
     pub fn winner(&self) -> Option<Player> {
         SEQUENCES
             .iter()
-            .map(|seq| seq.map(|(x, y)| self.get(x, y).unwrap()))
-            .filter(|pieces| pieces.iter().all(|&cell| cell == pieces[0]))
+            .map(|seq| seq.map(|coord| self.board.get(coord).unwrap()))
+            .filter(|pieces| {
+                pieces
+                    .iter()
+                    .all(|&cell| cell != Piece::Blank && cell == pieces[0])
+            })
             .next()
             .map(|pieces| self.player_by_piece(pieces[0]))
     }
-    fn calculate_move(&self, player: Player) -> Result<(usize, usize), String> {
+    fn calculate_move(&self, player: Player) -> Result<Coord, String> {
         use Opponent::*;
 
         match player.opponent {
-            Human => Self::human_move(),
-            Computer => Ok(self.computer_move()),
+            Human => self.human_move(),
+            Computer => self
+                .computer_move()
+                .ok_or("No moves left to make".to_string()),
         }
     }
-    fn human_move() -> Result<(usize, usize), String> {
+    fn human_move(&self) -> Result<Coord, String> {
         let coords = loop {
             println!("Please enter two numbers between 0 and 2, separated by a space:");
 
@@ -149,10 +238,18 @@ impl Game {
 
             match numbers[..] {
                 [x, y] => {
-                    if (0, 0) <= (x, y) && (x, y) <= (2, 2) {
-                        break (x, y);
+                    let coord = Coord(x, y);
+                    match self.board.get(coord) {
+                        Err(mess) => {
+                            println!("{}", mess);
+                        }
+                        Ok(Piece::Circle) | Ok(Piece::Cross) => {
+                            println!("There's already a piece...")
+                        }
+                        Ok(Piece::Blank) => {
+                            break Coord(x, y);
+                        }
                     }
-                    println!("{x} and {y} are not valid coordinates");
                 }
                 _ => {
                     println!("Input is invalid");
@@ -161,52 +258,36 @@ impl Game {
         };
         Ok(coords)
     }
-    fn computer_move(&self) -> (usize, usize) {
+    fn computer_move(&self) -> Option<Coord> {
         let mut game_clone = self.clone();
-        iproduct!(0..3, 0..3)
-            .map(|(i, j)| (i, j, self.best_move(self.players[1], i, j).unwrap()))
-            .sorted_by(|a, b| Ord::cmp(&a.2, &b.2))
-            .map(|(i, j, _)| (i, j))
-            .next()
-            .unwrap()
+        game_clone.best_move(self.players[1].piece).map(|mov| mov.0)
     }
-    fn best_move(&mut self, player: Player, x: usize, y: usize) -> Result<Outcome, String> {
-        for (i, j) in iproduct!(0..3, 0..3) {
-            if self.get(i, j)? == Piece::Blank {
+    fn best_move(&mut self, piece: Piece) -> Option<(Coord, Outcome)> {
+        let mut outcomes = vec![];
+        for &coord in CELLS.iter() {
+            if self.board.get(coord).unwrap() != Piece::Blank {
                 continue;
             }
-            self.set(i, j, player.piece)?;
-            match self.winner() {
-                Some(pl) if pl == player => {
-                    return Ok((i, j));
-                }
-                Some(_) | None => (),
+            self.board.set(coord, piece).unwrap();
+            let outcome = match self.winner() {
+                Some(_) => Outcome::Win,
+                None => self
+                    .best_move(piece.opposite())
+                    .map_or(Outcome::Tie, |res| res.1.opposite()),
             };
+            outcomes.push((coord, outcome));
+            self.board.set_to_blank(coord).unwrap();
         }
-        Ok((0, 0))
+        outcomes
+            .iter()
+            .max_by(|a, b| Ord::cmp(&a.1, &b.1))
+            .map(|res| res.to_owned())
     }
-    fn get(&self, x: usize, y: usize) -> Result<Piece, String> {
-        if x > 2 || y > 2 {
-            return Err("The following coordinates are off: {x} {y}".to_string());
-        }
-        Ok(self.board.0[x * 3 + y])
-    }
-    fn set(&mut self, x: usize, y: usize, piece: Piece) -> Result<(), String> {
-        use Piece::*;
-
-        match self.get(x, y)? {
-            Circle | Cross => Err("Piece already present".to_string()),
-            Blank => {
-                self.board.0[x * 3 + y] = piece;
-                Ok(())
-            }
-        }
-    }
-    fn current_player(&self, turn: usize) -> Player {
-        let current_piece = if turn % 2 == 0 {
-            Piece::Circle
-        } else {
+    fn current_player(&self) -> Player {
+        let current_piece = if self.board.used_cells() % 2 == 0 {
             Piece::Cross
+        } else {
+            Piece::Circle
         };
         self.player_by_piece(current_piece)
     }
