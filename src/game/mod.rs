@@ -4,21 +4,10 @@ mod model;
 use anyhow::Result;
 use calc::Cache;
 use itertools::Itertools;
-use model::{Board, Coord, Opponent, Outcome, Piece, Player};
+use model::{Board, Coord, Opponent, Outcome, Piece, Player, CELLS};
 use rand::Rng;
 use std::io;
 
-static CELLS: [Coord; 9] = [
-    Coord(0, 0),
-    Coord(0, 1),
-    Coord(0, 2),
-    Coord(1, 0),
-    Coord(1, 1),
-    Coord(1, 2),
-    Coord(2, 0),
-    Coord(2, 1),
-    Coord(2, 2),
-];
 static SEQUENCES: [[Coord; 3]; 8] = [
     [Coord(0, 0), Coord(1, 0), Coord(2, 0)],
     [Coord(0, 1), Coord(1, 1), Coord(2, 1)],
