@@ -5,33 +5,11 @@ impl Into<u32> for Board {
     fn into(self) -> u32 {
         self.0
             .iter()
+            .flatten()
             .enumerate()
             .map(|(i, &piece)| Into::<u32>::into(piece) << 2 * i)
             .reduce(u32::bitor)
             .unwrap()
-    }
-}
-impl Coord {
-    fn right_rotate(&self, times: usize) -> Self {
-        let result = (0..times).fold(self.flat_ind(), |acc, _| Self::right_rotate_cell(acc));
-        Self::from_flat_ind(result)
-    }
-    fn from_flat_ind(ind: usize) -> Self {
-        Self(ind / 3, ind % 3)
-    }
-    fn right_rotate_cell(cell: usize) -> usize {
-        match cell {
-            0 => 2,
-            1 => 5,
-            2 => 8,
-            3 => 1,
-            4 => 4,
-            5 => 7,
-            6 => 0,
-            7 => 3,
-            8 => 6,
-            _ => panic!("uh oh"),
-        }
     }
 }
 impl Board {
@@ -51,16 +29,19 @@ impl Board {
             acc
         })
     }
-    fn right_rotate(&self) -> Self {
-        let mut new_board = self.clone();
-        self.0.iter().enumerate().for_each(|(i, &p)| {
-            let new_position = Coord::right_rotate_cell(i);
-            new_board.0[new_position] = p;
+    fn right_rotate(self) -> Self {
+        let mut new_board = self;
+        CELLS.iter().for_each(|&coord| {
+            let new_position = Self::right_rotate_coord(coord, 1);
+            new_board.place(new_position, self.get(coord).unwrap());
         });
         new_board
     }
+    pub fn right_rotate_coord(coord: Coord, times: usize) -> Coord {
+        let actual_times = times % 4;
+        (0..actual_times).fold(coord, |acc, _| (acc.1, 2 - acc.0))
+    }
 }
-// static MASK: u32 = 3;
 
 #[derive(Clone)]
 pub struct Cache(HashMap<u32, (Coord, Outcome)>);
@@ -70,30 +51,22 @@ impl Cache {
     }
     pub fn check(&self, board: Board) -> Option<(Coord, Outcome)> {
         let (rotations, rotated) = board.rotate_min();
-        let back_rotations = (4 - rotations) % 4;
-        self.0
-            .get(&rotated)
-            .map(|(coord, outcome)| (coord.right_rotate(back_rotations), *outcome).to_owned())
+        let back_rotations = 4 - rotations;
+        self.0.get(&rotated).map(|(coord, outcome)| {
+            (Board::right_rotate_coord(*coord, back_rotations), *outcome).to_owned()
+        })
     }
     pub fn add(&mut self, board: &Board, res: (Coord, Outcome)) {
         let (_, rotated) = board.rotate_min();
-        // dbg!(format!("{:b}", &rotated));
         self.0.insert(rotated, res);
     }
 }
 
 mod tests {
+    use super::Piece as P;
     use super::*;
     use rand;
     use rand::Rng;
-
-    #[test]
-    fn coord_ind_conversion() {
-        for &coord in CELLS.iter() {
-            assert_eq!(coord, Coord::from_flat_ind(coord.flat_ind()));
-            assert_eq!(coord, coord.right_rotate(4));
-        }
-    }
 
     #[test]
     fn cached_result_is_rotated() {
@@ -102,7 +75,7 @@ mod tests {
 
         for &coord in CELLS.iter() {
             let mut board = Board::new();
-            board.set(coord, Piece::Cross).unwrap();
+            board.place(coord, Piece::Cross).unwrap();
             cache.add(&board, (coord, Outcome::Win));
         }
         assert_eq!(cache.0.keys().count(), 3);
@@ -111,20 +84,14 @@ mod tests {
     fn board_rotate() {
         let mut board = Board::new();
         assert_eq!(board.rotate_min(), (0, 0));
-        board.set(Coord(0, 0), Piece::Cross).unwrap();
+        board.place((0, 0), Piece::Cross).unwrap();
         assert_eq!(board.rotate_min(), (0, 2));
         assert_eq!(
             board.right_rotate(),
             Board([
-                Piece::Blank,
-                Piece::Blank,
-                Piece::Cross,
-                Piece::Blank,
-                Piece::Blank,
-                Piece::Blank,
-                Piece::Blank,
-                Piece::Blank,
-                Piece::Blank,
+                [P::Blank, P::Blank, P::Cross],
+                [P::Blank, P::Blank, P::Blank],
+                [P::Blank, P::Blank, P::Blank],
             ])
         )
     }

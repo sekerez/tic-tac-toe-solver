@@ -28,6 +28,17 @@ impl Piece {
         }
     }
 }
+impl fmt::Display for Piece {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Piece as P;
+        let symbol = match self {
+            P::Blank => ' ',
+            P::Circle => 'O',
+            P::Cross => 'X',
+        };
+        write!(f, "{}", symbol)
+    }
+}
 impl From<String> for Piece {
     fn from(rep: String) -> Self {
         use Piece as P;
@@ -37,6 +48,11 @@ impl From<String> for Piece {
             " " => P::Blank,
             _ => panic!("{rep} is invalid as a piece representation."),
         }
+    }
+}
+impl Into<String> for Piece {
+    fn into(self) -> String {
+        format!("{}", self)
     }
 }
 impl Into<u32> for Piece {
@@ -49,17 +65,6 @@ impl Into<u32> for Piece {
         }
     }
 }
-impl fmt::Display for Piece {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Piece as P;
-        let symbol = match self {
-            P::Blank => ' ',
-            P::Circle => 'O',
-            P::Cross => 'X',
-        };
-        write!(f, "{}", symbol)
-    }
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Board(pub [[Piece; 3]; 3]);
@@ -67,21 +72,34 @@ impl Board {
     pub fn new() -> Self {
         Self([[Piece::Blank; 3]; 3])
     }
-    pub fn get(&self, coord: Coord) -> Result<Piece, &str> {
-        self.get_by_coord(coord).map(|p| p.to_owned())
+    pub fn get(&self, coord: Coord) -> Result<Piece, String> {
+        self.0
+            .get(coord.0)
+            .and_then(|arr| arr.get(coord.1))
+            .ok_or(format!(
+                "The following coordinates are out of bounds: {} {}",
+                coord.0, coord.1
+            ))
+            .copied()
     }
-    pub fn set(&mut self, coord: Coord, piece: Piece) -> Result<(), &str> {
+    pub fn place(&mut self, coord: Coord, piece: Piece) -> Result<(), String> {
         use Piece as P;
-        let existing_piece = self.get_by_coord(coord).and_then(|p| match *p {
-            P::Blank => Ok(p),
-            P::Cross | P::Circle => Err(&format!("Piece already present: {p}")[..]),
-        })?;
-        *existing_piece = piece;
+        match self.get(coord)? {
+            P::Blank => (),
+            existing_piece @ (P::Cross | P::Circle) => {
+                return Err(format!("Piece already present: {}", existing_piece));
+            }
+        };
+        self.set(coord, piece);
         Ok(())
     }
-    pub fn set_to_blank(&mut self, coord: Coord) -> Result<(), String> {
-        *self.get_by_coord(coord)? = Piece::Blank;
+    pub fn reset(&mut self, coord: Coord) -> Result<(), String> {
+        self.get(coord)?;
+        self.set(coord, Piece::Blank);
         Ok(())
+    }
+    fn set(&mut self, coord: Coord, piece: Piece) {
+        self.0[coord.0][coord.1] = piece;
     }
     pub fn used_cells(&self) -> usize {
         self.0
@@ -89,40 +107,27 @@ impl Board {
             .map(|arr| arr.iter().filter(|&&p| p != Piece::Blank).count())
             .sum()
     }
-    fn get_by_coord(&mut self, coord: Coord) -> Result<&mut Piece, &str> {
-        self.0
-            .get_mut(coord.0)
-            .and_then(|arr| arr.get_mut(coord.1))
-            .ok_or(
-                &format!(
-                    "The following coordinates are out of bounds: {} {}",
-                    coord.0, coord.1
-                )[..],
-            )
-    }
 }
 impl fmt::Display for Board {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}|{}|{}\n{}|{}|{}\n{}|{}|{}\n",
-            self.0[0],
-            self.0[1],
-            self.0[2],
-            self.0[3],
-            self.0[4],
-            self.0[5],
-            self.0[6],
-            self.0[7],
-            self.0[8],
-        )
+        let cells = CELLS
+            .chunks(3)
+            .map(|row| {
+                row.iter()
+                    .map(|&coord| self.get(coord).unwrap().into())
+                    .collect::<Vec<String>>()
+                    .join("|")
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        write!(f, "{}\n", cells)
     }
 }
-impl From<String> for Board {
-    fn from(rep: String) -> Self {
-        Board(rep.split("\n").map(|s| s.split("|").map(parse)))
-    }
-}
+// impl From<String> for Board {
+//     fn from(rep: String) -> Self {
+//         Board(rep.split("\n").map(|s| s.split("|").map(parse)))
+//     }
+// }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, strum_macros::Display)]
 pub enum Opponent {

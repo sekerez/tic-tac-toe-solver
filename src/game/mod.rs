@@ -9,14 +9,14 @@ use rand::Rng;
 use std::io;
 
 static SEQUENCES: [[Coord; 3]; 8] = [
-    [Coord(0, 0), Coord(1, 0), Coord(2, 0)],
-    [Coord(0, 1), Coord(1, 1), Coord(2, 1)],
-    [Coord(0, 2), Coord(1, 2), Coord(2, 2)], // Verticals
-    [Coord(0, 0), Coord(0, 1), Coord(0, 2)],
-    [Coord(1, 0), Coord(1, 1), Coord(1, 2)],
-    [Coord(2, 0), Coord(2, 1), Coord(2, 2)], // Horizontals
-    [Coord(0, 0), Coord(1, 1), Coord(2, 2)],
-    [Coord(0, 2), Coord(1, 1), Coord(2, 0)], // Diagonals
+    [(0, 0), (1, 0), (2, 0)],
+    [(0, 1), (1, 1), (2, 1)],
+    [(0, 2), (1, 2), (2, 2)], // Verticals
+    [(0, 0), (0, 1), (0, 2)],
+    [(1, 0), (1, 1), (1, 2)],
+    [(2, 0), (2, 1), (2, 2)], // Horizontals
+    [(0, 0), (1, 1), (2, 2)],
+    [(0, 2), (1, 1), (2, 0)], // Diagonals
 ];
 
 #[derive(Clone)]
@@ -45,7 +45,7 @@ impl Game {
     pub fn play_board_move(&mut self) -> Result<(), String> {
         let current_player = self.current_player();
         let coord = self.calculate_move(current_player)?;
-        self.board.set(coord, current_player.piece)?;
+        self.board.place(coord, current_player.piece)?;
         Ok(())
     }
     pub fn winner(&self) -> Option<Player> {
@@ -85,7 +85,7 @@ impl Game {
 
             match numbers[..] {
                 [x, y] => {
-                    let coord = Coord(x, y);
+                    let coord = (x, y);
                     match self.board.get(coord) {
                         Err(mess) => {
                             println!("{}", mess);
@@ -94,7 +94,7 @@ impl Game {
                             println!("There's already a piece...")
                         }
                         Ok(Piece::Blank) => {
-                            break Coord(x, y);
+                            break (x, y);
                         }
                     }
                 }
@@ -128,7 +128,7 @@ impl Game {
             if self.board.get(coord).unwrap() != Piece::Blank {
                 continue;
             }
-            self.board.set(coord, piece).unwrap();
+            self.board.place(coord, piece).unwrap();
             if let Some(cached) = self.cache.check(self.board) {
                 return Some(cached);
             }
@@ -139,7 +139,7 @@ impl Game {
                     .map_or(Outcome::Tie, |res| res.1.opposite()),
             };
             self.cache.add(&self.board, (coord, outcome));
-            self.board.set_to_blank(coord).unwrap();
+            self.board.reset(coord).unwrap();
             if outcome == Outcome::Win {
                 dbg!(outcomes);
                 return Some((coord, outcome));
@@ -189,15 +189,9 @@ mod tests {
     #[test]
     fn winner() {
         let game = make_game(Board([
-            P::Cross,
-            P::Circle,
-            P::Blank,
-            P::Blank,
-            P::Circle,
-            P::Blank,
-            P::Cross,
-            P::Circle,
-            P::Cross,
+            [P::Cross, P::Circle, P::Blank],
+            [P::Blank, P::Circle, P::Blank],
+            [P::Cross, P::Circle, P::Cross],
         ]));
         let winner = game.winner();
         assert_eq!(winner, Some(game.players[1]));
@@ -205,17 +199,11 @@ mod tests {
     #[test]
     fn make_best_move() {
         let game = make_game(Board([
-            P::Cross,
-            P::Circle,
-            P::Blank,
-            P::Blank,
-            P::Circle,
-            P::Blank,
-            P::Cross,
-            P::Blank,
-            P::Cross,
+            [P::Cross, P::Circle, P::Blank],
+            [P::Blank, P::Circle, P::Blank],
+            [P::Cross, P::Blank, P::Cross],
         ]));
         let best_move = game.computer_move();
-        assert_eq!(best_move, Some(Coord(2, 1)));
+        assert_eq!(best_move, Some((2, 1)));
     }
 }
