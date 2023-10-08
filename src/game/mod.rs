@@ -53,9 +53,7 @@ impl Game {
             .iter()
             .map(|seq| seq.map(|coord| self.board.get(coord).unwrap()))
             .filter(|pieces| {
-                pieces
-                    .iter()
-                    .all(|&cell| cell != Piece::Blank && cell == pieces[0])
+                pieces[0] != Piece::Blank && pieces.iter().all(|&cell| cell == pieces[0])
             })
             .next()
             .map(|pieces| self.player_by_piece(pieces[0]))
@@ -143,6 +141,7 @@ impl Game {
             self.cache.add(&self.board, (coord, outcome));
             self.board.set_to_blank(coord).unwrap();
             if outcome == Outcome::Win {
+                dbg!(outcomes);
                 return Some((coord, outcome));
             }
             outcomes.push((coord, outcome));
@@ -152,7 +151,7 @@ impl Game {
             .sorted_by(|a, b| Ord::cmp(&a.1, &b.1))
             .collect();
 
-        // dbg!(&res);
+        dbg!(&res);
         res.first().map(|res| res.to_owned().to_owned())
     }
     fn current_player(&self) -> Player {
@@ -169,5 +168,54 @@ impl Game {
         } else {
             self.players[1]
         }
+    }
+}
+
+mod tests {
+    use super::*;
+    use Piece as P;
+
+    fn make_game(board: Board) -> Game {
+        Game {
+            board,
+            players: [
+                Player::new(Opponent::Human, P::Cross).unwrap(),
+                Player::new(Opponent::Computer, P::Circle).unwrap(),
+            ],
+            cache: Cache::new(),
+        }
+    }
+
+    #[test]
+    fn winner() {
+        let game = make_game(Board([
+            P::Cross,
+            P::Circle,
+            P::Blank,
+            P::Blank,
+            P::Circle,
+            P::Blank,
+            P::Cross,
+            P::Circle,
+            P::Cross,
+        ]));
+        let winner = game.winner();
+        assert_eq!(winner, Some(game.players[1]));
+    }
+    #[test]
+    fn make_best_move() {
+        let game = make_game(Board([
+            P::Cross,
+            P::Circle,
+            P::Blank,
+            P::Blank,
+            P::Circle,
+            P::Blank,
+            P::Cross,
+            P::Blank,
+            P::Cross,
+        ]));
+        let best_move = game.computer_move();
+        assert_eq!(best_move, Some(Coord(2, 1)));
     }
 }

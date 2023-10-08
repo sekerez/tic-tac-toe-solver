@@ -3,16 +3,13 @@ use anyhow::Result;
 use std::fmt;
 use strum_macros;
 
+pub type Coord = (usize, usize);
+
+#[rustfmt::skip]
 pub static CELLS: [Coord; 9] = [
-    Coord(0, 0),
-    Coord(0, 1),
-    Coord(0, 2),
-    Coord(1, 0),
-    Coord(1, 1),
-    Coord(1, 2),
-    Coord(2, 0),
-    Coord(2, 1),
-    Coord(2, 2),
+    (0, 0), (0, 1), (0, 2),
+    (1, 0), (1, 1), (1, 2),
+    (2, 0), (2, 1), (2, 2),
 ];
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
@@ -28,6 +25,17 @@ impl Piece {
             P::Blank => P::Blank,
             P::Circle => P::Cross,
             P::Cross => P::Circle,
+        }
+    }
+}
+impl From<String> for Piece {
+    fn from(rep: String) -> Self {
+        use Piece as P;
+        match &rep[..] {
+            "X" => P::Cross,
+            "O" => P::Circle,
+            " " => P::Blank,
+            _ => panic!("{rep} is invalid as a piece representation."),
         }
     }
 }
@@ -53,63 +61,66 @@ impl fmt::Display for Piece {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct Coord(pub usize, pub usize);
-impl Coord {
-    pub fn out_of_bounds(self) -> Result<(), String> {
-        if self.0 > 2 || self.1 > 2 {
-            return Err(format!(
-                "The following coordinates are out of bounds: {} {}",
-                self.0, self.1
-            )
-            .to_string());
-        }
-        Ok(())
-    }
-    pub fn flat_ind(self) -> usize {
-        self.0 * 3 + self.1
-    }
-}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Board(pub [Piece; 9]);
+pub struct Board(pub [[Piece; 3]; 3]);
 impl Board {
     pub fn new() -> Self {
-        Self([Piece::Blank; 9])
+        Self([[Piece::Blank; 3]; 3])
     }
-    pub fn get(&self, coord: Coord) -> Result<Piece, String> {
-        coord.out_of_bounds()?;
-        Ok(self.0[coord.flat_ind()])
+    pub fn get(&self, coord: Coord) -> Result<Piece, &str> {
+        self.get_by_coord(coord).map(|p| p.to_owned())
     }
-    pub fn set(&mut self, coord: Coord, piece: Piece) -> Result<(), String> {
+    pub fn set(&mut self, coord: Coord, piece: Piece) -> Result<(), &str> {
         use Piece as P;
-
-        coord.out_of_bounds()?;
-        match self.get(coord)? {
-            P::Circle | P::Cross => Err("Piece already present".to_string()),
-            P::Blank => {
-                self.0[coord.flat_ind()] = piece;
-                Ok(())
-            }
-        }
+        let existing_piece = self.get_by_coord(coord).and_then(|p| match *p {
+            P::Blank => Ok(p),
+            P::Cross | P::Circle => Err(&format!("Piece already present: {p}")[..]),
+        })?;
+        *existing_piece = piece;
+        Ok(())
     }
     pub fn set_to_blank(&mut self, coord: Coord) -> Result<(), String> {
-        coord.out_of_bounds()?;
-        self.0[coord.flat_ind()] = Piece::Blank;
+        *self.get_by_coord(coord)? = Piece::Blank;
         Ok(())
     }
     pub fn used_cells(&self) -> usize {
-        self.0.iter().filter(|&&p| p != Piece::Blank).count()
+        self.0
+            .iter()
+            .map(|arr| arr.iter().filter(|&&p| p != Piece::Blank).count())
+            .sum()
+    }
+    fn get_by_coord(&mut self, coord: Coord) -> Result<&mut Piece, &str> {
+        self.0
+            .get_mut(coord.0)
+            .and_then(|arr| arr.get_mut(coord.1))
+            .ok_or(
+                &format!(
+                    "The following coordinates are out of bounds: {} {}",
+                    coord.0, coord.1
+                )[..],
+            )
     }
 }
 impl fmt::Display for Board {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let formatted = self
-            .0
-            .chunks(3)
-            .map(|chunk| format!("{}|{}|{}", chunk[0], chunk[1], chunk[2]))
-            .collect::<Vec<_>>()
-            .join("\n");
-        write!(f, "{}\n", formatted)
+        write!(
+            f,
+            "{}|{}|{}\n{}|{}|{}\n{}|{}|{}\n",
+            self.0[0],
+            self.0[1],
+            self.0[2],
+            self.0[3],
+            self.0[4],
+            self.0[5],
+            self.0[6],
+            self.0[7],
+            self.0[8],
+        )
+    }
+}
+impl From<String> for Board {
+    fn from(rep: String) -> Self {
+        Board(rep.split("\n").map(|s| s.split("|").map(parse)))
     }
 }
 
