@@ -121,6 +121,7 @@ pub enum Opponent {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, strum_macros::Display, PartialOrd, Ord)]
 pub enum Outcome {
+    // TODO delete
     Win,
     Tie,
     Loss,

@@ -77,7 +77,7 @@ impl Cache {
     }
     pub fn add(&mut self, board: &Board, res: (Coord, Outcome)) {
         let (_, rotated) = board.rotate_min();
-        dbg!(format!("{:b}", &rotated));
+        // dbg!(format!("{:b}", &rotated));
         self.0.insert(rotated, res);
     }
 }

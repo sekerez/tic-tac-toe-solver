@@ -113,6 +113,18 @@ impl Game {
         game_clone.best_move(self.players[1].piece).map(|mov| mov.0)
     }
     fn best_move(&mut self, piece: Piece) -> Option<(Coord, Outcome)> {
+        // Problem: When playing second, sometimes the computer fucks up
+        // such as with this:
+        // State of the board:
+        // X|O|
+        //  |O|
+        // X| |X
+        //
+        // Computer calculating move...
+        // State of the board:
+        // X|O|
+        //  |O|O
+        // X| |X
         let mut outcomes = vec![];
         for &coord in CELLS.iter() {
             if self.board.get(coord).unwrap() != Piece::Blank {
@@ -140,7 +152,7 @@ impl Game {
             .sorted_by(|a, b| Ord::cmp(&a.1, &b.1))
             .collect();
 
-        dbg!(&res);
+        // dbg!(&res);
         res.first().map(|res| res.to_owned().to_owned())
     }
     fn current_player(&self) -> Player {
