@@ -70,7 +70,7 @@ impl Coord {
         self.0 * 3 + self.1
     }
 }
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Board(pub [Piece; 9]);
 impl Board {
     pub fn new() -> Self {
