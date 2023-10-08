@@ -13,29 +13,25 @@ impl Into<u32> for Board {
     }
 }
 impl Board {
-    fn rotate_min(&self) -> (usize, u32) {
-        let rotations = self.rotations();
+    fn rotate_min(self) -> (usize, u32) {
+        let rotations = (0..3).fold(vec![self], |mut acc, _| {
+            acc.push(acc.last().unwrap().right_rotate());
+            acc
+        });
         rotations
             .iter()
             .map(|b| b.to_owned().into())
             .enumerate()
             .min_by(|a, b| Ord::cmp(&a.1, &b.1))
-            .map(|(i, rot)| (i, rot))
             .unwrap()
     }
-    fn rotations(&self) -> Vec<Board> {
-        (0..3).fold(vec![self.clone()], |mut acc, _| {
-            acc.push(acc.last().unwrap().right_rotate());
-            acc
-        })
-    }
     fn right_rotate(self) -> Self {
-        let mut new_board = self;
-        CELLS.iter().for_each(|&coord| {
+        CELLS.iter().fold(Board::new(), |mut board, &coord| {
+            let piece = self.get(coord).unwrap();
             let new_position = Self::right_rotate_coord(coord, 1);
-            new_board.place(new_position, self.get(coord).unwrap());
-        });
-        new_board
+            board.place(new_position, piece).unwrap();
+            board
+        })
     }
     pub fn right_rotate_coord(coord: Coord, times: usize) -> Coord {
         let actual_times = times % 4;

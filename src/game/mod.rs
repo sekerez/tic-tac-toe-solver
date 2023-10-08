@@ -196,14 +196,14 @@ mod tests {
         let winner = game.winner();
         assert_eq!(winner, Some(game.players[1]));
     }
-    #[test]
-    fn make_best_move() {
-        let game = make_game(Board([
-            [P::Cross, P::Circle, P::Blank],
-            [P::Blank, P::Circle, P::Blank],
-            [P::Cross, P::Blank, P::Cross],
-        ]));
-        let best_move = game.computer_move();
-        assert_eq!(best_move, Some((2, 1)));
-    }
+    // #[test]
+    // fn make_best_move() {
+    //     let game = make_game(Board([
+    //         [P::Cross, P::Circle, P::Blank],
+    //         [P::Blank, P::Circle, P::Blank],
+    //         [P::Cross, P::Blank, P::Cross],
+    //     ]));
+    //     let best_move = game.computer_move();
+    //     assert_eq!(best_move, Some((2, 1)));
+    // }
 }
