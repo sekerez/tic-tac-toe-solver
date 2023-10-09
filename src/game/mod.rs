@@ -111,16 +111,11 @@ impl Game {
     }
     fn best_move(&mut self, piece: Piece) -> Option<(Coord, Outcome)> {
         let mut outcomes = vec![];
-        let past_used_cells = self.board.used_cells();
         for &coord in CELLS.iter() {
             if self.board.get(coord).unwrap() != Piece::Blank {
                 continue;
             }
             self.board.place(coord, piece).unwrap();
-            println!(
-                "{} player places on {:?} with {} used cells, resulting in:\n{}",
-                piece, coord, past_used_cells, self.board
-            );
             let outcome = match self.cache.check(self.board) {
                 Some(res) => res.1,
                 None => {
@@ -142,7 +137,8 @@ impl Game {
         }
         outcomes
             .iter()
-            .max_by(|a, b| Ord::cmp(&a.1, &b.1))
+            .find(|(_, outcome)| *outcome == Outcome::Tie)
+            .or(outcomes.first())
             .map(|r| r.to_owned())
     }
     fn current_player(&self) -> (Player, Piece) {
@@ -197,9 +193,6 @@ mod tests {
     }
     #[test]
     fn winner_two() {
-        // X|O|X
-        // X|X|O
-        // O| |O
         let game = make_game(
             Board([
                 [P::Cross, P::Circle, P::Cross],

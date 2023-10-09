@@ -123,11 +123,6 @@ impl fmt::Display for Board {
         write!(f, "{}\n", cells)
     }
 }
-// impl From<String> for Board {
-//     fn from(rep: String) -> Self {
-//         Board(rep.split("\n").map(|s| s.split("|").map(parse)))
-//     }
-// }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, strum_macros::Display)]
 pub enum Player {
@@ -146,7 +141,6 @@ impl Player {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, strum_macros::Display, PartialOrd, Ord)]
 pub enum Outcome {
-    // TODO delete
     Win,
     Tie,
     Loss,
