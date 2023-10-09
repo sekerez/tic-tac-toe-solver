@@ -3,7 +3,9 @@ mod model;
 
 use anyhow::Result;
 use calc::Cache;
+use itertools::Itertools;
 use model::{Board, Coord, Outcome, Piece, Player, CELLS};
+use rand::seq::SliceRandom;
 use rand::Rng;
 use std::io;
 
@@ -107,9 +109,9 @@ impl Game {
         let (_, current_piece) = self.current_player();
         println!("Computer calculating move...");
         let mut game_clone = self.clone();
-        game_clone.best_move(current_piece).map(|mov| mov.0)
+        game_clone.best_move(current_piece).map(|mov| mov.1)
     }
-    fn best_move(&mut self, piece: Piece) -> Option<(Coord, Outcome)> {
+    fn best_move(&mut self, piece: Piece) -> Option<(Outcome, Coord)> {
         let mut outcomes = vec![];
         for &coord in CELLS.iter() {
             if self.board.get(coord).unwrap() != Piece::Blank {
@@ -123,23 +125,30 @@ impl Game {
                         Some(_) => Outcome::Win,
                         None => self
                             .best_move(piece.opposite())
-                            .map_or(Outcome::Tie, |res| res.1.opposite()),
+                            .map_or(Outcome::Tie, |res| res.0.opposite()),
                     };
                     self.cache.add(&self.board, (coord, outcome));
                     outcome
                 }
             };
             self.board.reset(coord).unwrap();
-            if outcome == Outcome::Win {
-                return Some((coord, outcome));
-            }
-            outcomes.push((coord, outcome));
+            outcomes.push((outcome, coord));
         }
         outcomes
-            .iter()
-            .find(|(_, outcome)| *outcome == Outcome::Tie)
-            .or(outcomes.first())
-            .map(|r| r.to_owned())
+            .into_iter()
+            .sorted_by(|a, b| Ord::cmp(&a.0, &b.0))
+            .group_by(|r| r.0)
+            .into_iter()
+            .map(|(outcome, group)| {
+                let rand_coord = group
+                    .into_iter()
+                    .collect::<Vec<_>>()
+                    .choose(&mut rand::thread_rng())
+                    .unwrap()
+                    .1;
+                (outcome, rand_coord)
+            })
+            .next()
     }
     fn current_player(&self) -> (Player, Piece) {
         if self.board.used_cells() % 2 == 0 {

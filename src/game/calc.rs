@@ -4,10 +4,10 @@ use std::{collections::HashMap, ops::BitOr};
 impl Into<u32> for Board {
     fn into(self) -> u32 {
         self.0
-            .iter()
+            .into_iter()
             .flatten()
             .enumerate()
-            .map(|(i, &piece)| Into::<u32>::into(piece) << 2 * i)
+            .map(|(i, piece)| Into::<u32>::into(piece) << 2 * i)
             .reduce(u32::bitor)
             .unwrap()
     }
