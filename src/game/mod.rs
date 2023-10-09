@@ -3,8 +3,7 @@ mod model;
 
 use anyhow::Result;
 use calc::Cache;
-use itertools::Itertools;
-use model::{Board, Coord, Opponent, Outcome, Piece, Player, CELLS};
+use model::{Board, Coord, Outcome, Piece, Player, CELLS};
 use rand::Rng;
 use std::io;
 
@@ -22,51 +21,50 @@ static SEQUENCES: [[Coord; 3]; 8] = [
 #[derive(Clone)]
 pub struct Game {
     pub board: Board,
-    players: [Player; 2],
+    first: Player,
     cache: Cache,
 }
 
 impl Game {
     pub fn new() -> Result<Self, String> {
+        use Player as P;
         let mut rng = rand::thread_rng();
-        let mut pieces = [Piece::Cross, Piece::Circle];
-        if rng.gen::<bool>() {
-            pieces.reverse();
-        }
+        let first = if rng.gen::<bool>() {
+            P::Computer
+        } else {
+            P::Human
+        };
         Ok(Game {
             board: Board::new(),
-            players: [
-                Player::new(Opponent::Human, pieces[0])?,
-                Player::new(Opponent::Computer, pieces[1])?,
-            ],
             cache: Cache::new(),
+            first,
         })
     }
     pub fn play_board_move(&mut self) -> Result<(), String> {
-        let current_player = self.current_player();
-        let coord = self.calculate_move(current_player)?;
-        self.board.place(coord, current_player.piece)?;
+        let (coord, piece) = self.calculate_move()?;
+        self.board.place(coord, piece)?;
         Ok(())
     }
     pub fn winner(&self) -> Option<Player> {
         SEQUENCES
             .iter()
             .map(|seq| seq.map(|coord| self.board.get(coord).unwrap()))
-            .filter(|pieces| {
+            .find(|pieces| {
                 pieces[0] != Piece::Blank && pieces.iter().all(|&cell| cell == pieces[0])
             })
-            .next()
             .map(|pieces| self.player_by_piece(pieces[0]))
     }
-    fn calculate_move(&self, player: Player) -> Result<Coord, String> {
-        use Opponent::*;
+    fn calculate_move(&self) -> Result<(Coord, Piece), String> {
+        use Player as P;
+        let (current_player, current_piece) = self.current_player();
 
-        match player.opponent {
-            Human => self.human_move(),
-            Computer => self
+        let coord = match current_player {
+            P::Human => self.human_move(),
+            P::Computer => self
                 .computer_move()
                 .ok_or("No moves left to make".to_string()),
-        }
+        }?;
+        Ok((coord, current_piece))
     }
     fn human_move(&self) -> Result<Coord, String> {
         let coords = loop {
@@ -106,104 +104,137 @@ impl Game {
         Ok(coords)
     }
     fn computer_move(&self) -> Option<Coord> {
+        let (_, current_piece) = self.current_player();
         println!("Computer calculating move...");
         let mut game_clone = self.clone();
-        game_clone.best_move(self.players[1].piece).map(|mov| mov.0)
+        game_clone.best_move(current_piece).map(|mov| mov.0)
     }
     fn best_move(&mut self, piece: Piece) -> Option<(Coord, Outcome)> {
-        // Problem: When playing second, sometimes the computer fucks up
-        // such as with this:
-        // State of the board:
-        // X|O|
-        //  |O|
-        // X| |X
-        //
-        // Computer calculating move...
-        // State of the board:
-        // X|O|
-        //  |O|O
-        // X| |X
         let mut outcomes = vec![];
+        let past_used_cells = self.board.used_cells();
         for &coord in CELLS.iter() {
             if self.board.get(coord).unwrap() != Piece::Blank {
                 continue;
             }
             self.board.place(coord, piece).unwrap();
-            if let Some(cached) = self.cache.check(self.board) {
-                return Some(cached);
-            }
-            let outcome = match self.winner() {
-                Some(_) => Outcome::Win,
-                None => self
-                    .best_move(piece.opposite())
-                    .map_or(Outcome::Tie, |res| res.1.opposite()),
+            println!(
+                "{} player places on {:?} with {} used cells, resulting in:\n{}",
+                piece, coord, past_used_cells, self.board
+            );
+            let outcome = match self.cache.check(self.board) {
+                Some(res) => res.1,
+                None => {
+                    let outcome = match self.winner() {
+                        Some(_) => Outcome::Win,
+                        None => self
+                            .best_move(piece.opposite())
+                            .map_or(Outcome::Tie, |res| res.1.opposite()),
+                    };
+                    self.cache.add(&self.board, (coord, outcome));
+                    outcome
+                }
             };
-            self.cache.add(&self.board, (coord, outcome));
             self.board.reset(coord).unwrap();
             if outcome == Outcome::Win {
-                dbg!(outcomes);
                 return Some((coord, outcome));
             }
             outcomes.push((coord, outcome));
         }
-        let res: Vec<_> = outcomes
+        outcomes
             .iter()
-            .sorted_by(|a, b| Ord::cmp(&a.1, &b.1))
-            .collect();
-
-        dbg!(&res);
-        res.first().map(|res| res.to_owned().to_owned())
+            .max_by(|a, b| Ord::cmp(&a.1, &b.1))
+            .map(|r| r.to_owned())
     }
-    fn current_player(&self) -> Player {
-        let current_piece = if self.board.used_cells() % 2 == 0 {
-            Piece::Cross
+    fn current_player(&self) -> (Player, Piece) {
+        if self.board.used_cells() % 2 == 0 {
+            (self.first, Piece::Cross)
         } else {
-            Piece::Circle
-        };
-        self.player_by_piece(current_piece)
+            (self.first.opposite(), Piece::Circle)
+        }
     }
     fn player_by_piece(&self, piece: Piece) -> Player {
-        if self.players[0].piece == piece {
-            self.players[0]
+        use Player as P;
+        if (self.first == P::Computer) == (piece == Piece::Cross) {
+            P::Computer
         } else {
-            self.players[1]
+            P::Human
         }
     }
 }
 
+#[allow(dead_code)]
 mod tests {
     use super::*;
     use Piece as P;
 
-    fn make_game(board: Board) -> Game {
+    fn make_game(board: Board, computer_first: bool) -> Game {
+        use Player as Pl;
+
+        let first = if computer_first {
+            Pl::Computer
+        } else {
+            Pl::Human
+        };
         Game {
             board,
-            players: [
-                Player::new(Opponent::Human, P::Cross).unwrap(),
-                Player::new(Opponent::Computer, P::Circle).unwrap(),
-            ],
+            first,
             cache: Cache::new(),
         }
     }
 
     #[test]
-    fn winner() {
-        let game = make_game(Board([
-            [P::Cross, P::Circle, P::Blank],
-            [P::Blank, P::Circle, P::Blank],
-            [P::Cross, P::Circle, P::Cross],
-        ]));
+    fn winner_one() {
+        let game = make_game(
+            Board([
+                [P::Cross, P::Circle, P::Blank],
+                [P::Blank, P::Circle, P::Blank],
+                [P::Cross, P::Circle, P::Cross],
+            ]),
+            false,
+        );
         let winner = game.winner();
-        assert_eq!(winner, Some(game.players[1]));
+        assert_eq!(winner, Some(Player::Computer));
     }
-    // #[test]
-    // fn make_best_move() {
-    //     let game = make_game(Board([
-    //         [P::Cross, P::Circle, P::Blank],
-    //         [P::Blank, P::Circle, P::Blank],
-    //         [P::Cross, P::Blank, P::Cross],
-    //     ]));
-    //     let best_move = game.computer_move();
-    //     assert_eq!(best_move, Some((2, 1)));
-    // }
+    #[test]
+    fn winner_two() {
+        // X|O|X
+        // X|X|O
+        // O| |O
+        let game = make_game(
+            Board([
+                [P::Cross, P::Circle, P::Cross],
+                [P::Cross, P::Cross, P::Circle],
+                [P::Circle, P::Blank, P::Circle],
+            ]),
+            true,
+        );
+        let winner = game.winner();
+        assert_eq!(winner, None);
+    }
+    #[test]
+    fn make_best_move() {
+        let boards: [(Board, Coord); 2] = [
+            (
+                Board([
+                    [P::Cross, P::Circle, P::Cross],
+                    [P::Blank, P::Blank, P::Blank],
+                    [P::Blank, P::Blank, P::Circle],
+                ]),
+                (2, 0),
+            ),
+            (
+                Board([
+                    [P::Cross, P::Circle, P::Cross],
+                    [P::Cross, P::Blank, P::Circle],
+                    [P::Circle, P::Cross, P::Circle],
+                ]),
+                (1, 1),
+            ),
+        ];
+        for (board, expected) in boards {
+            let game = make_game(board, true);
+            let best_move = game.computer_move();
+            assert_eq!(best_move, Some(expected));
+        }
+    }
 }

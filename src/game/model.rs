@@ -130,9 +130,18 @@ impl fmt::Display for Board {
 // }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, strum_macros::Display)]
-pub enum Opponent {
+pub enum Player {
     Human,
     Computer,
+}
+impl Player {
+    pub fn opposite(self) -> Self {
+        use Player as P;
+        match self {
+            P::Human => P::Computer,
+            P::Computer => P::Human,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, strum_macros::Display, PartialOrd, Ord)]
@@ -151,25 +160,5 @@ impl Outcome {
             O::Tie => O::Tie,
             O::Loss => O::Win,
         }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Player {
-    pub opponent: Opponent,
-    pub piece: Piece,
-}
-impl fmt::Display for Player {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "({}, {})", self.opponent, self.piece)
-    }
-}
-
-impl Player {
-    pub fn new(opponent: Opponent, piece: Piece) -> Result<Self, String> {
-        if let Piece::Blank = piece {
-            return Err("Can't create a player with a blank piece".to_string());
-        }
-        Ok(Player { opponent, piece })
     }
 }
