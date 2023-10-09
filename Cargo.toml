@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.75"
+flamegraph = "0.6.3"
 itertools = "0.11.0"
 rand = "0.8.5"
 strum_macros = "0.25.2"

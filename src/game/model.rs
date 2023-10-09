@@ -33,11 +33,11 @@ impl fmt::Display for Piece {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use Piece as P;
         let symbol = match self {
-            P::Blank => ' ',
-            P::Circle => 'O',
-            P::Cross => 'X',
+            P::Blank => " ",
+            P::Circle => "O",
+            P::Cross => "X",
         };
-        write!(f, "{}", symbol)
+        write!(f, "{symbol}")
     }
 }
 impl From<&str> for Piece {
