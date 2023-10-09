@@ -56,16 +56,6 @@ impl Into<String> for Piece {
         format!("{}", self)
     }
 }
-impl Into<u32> for Piece {
-    fn into(self) -> u32 {
-        use Piece as P;
-        match self {
-            P::Blank => 0,
-            P::Circle => 1,
-            P::Cross => 2,
-        }
-    }
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Board(pub [[Piece; 3]; 3]);

@@ -1,19 +1,28 @@
 use super::model::{Board, Coord, Outcome, Piece, CELLS};
-use std::{collections::HashMap, ops::BitOr};
+use std::collections::HashMap;
 
-impl Into<u32> for Board {
-    fn into(self) -> u32 {
+impl Into<u16> for Piece {
+    fn into(self) -> u16 {
+        use Piece as P;
+        match self {
+            P::Blank => 0,
+            P::Circle => 1,
+            P::Cross => 2,
+        }
+    }
+}
+impl Into<u16> for Board {
+    fn into(self) -> u16 {
         self.0
             .into_iter()
             .flatten()
-            .enumerate()
-            .map(|(i, piece)| Into::<u32>::into(piece) << 2 * i)
-            .reduce(u32::bitor)
-            .unwrap()
+            .zip(0u32..)
+            .map(|(piece, i)| 3_u16.pow(i) * Into::<u16>::into(piece))
+            .sum()
     }
 }
 impl Board {
-    fn rotate_min(self) -> (usize, u32) {
+    fn rotate_min(self) -> (usize, u16) {
         (0..4)
             .map(|i| self.right_rotate(i).to_owned().into())
             .enumerate()
@@ -35,7 +44,7 @@ impl Board {
 }
 
 #[derive(Clone)]
-pub struct Cache(HashMap<u32, (Coord, Outcome)>);
+pub struct Cache(HashMap<u16, (Coord, Outcome)>);
 impl Cache {
     pub fn new() -> Self {
         Self(HashMap::new())
