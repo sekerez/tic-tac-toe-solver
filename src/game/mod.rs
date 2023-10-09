@@ -161,71 +161,57 @@ impl Game {
 #[allow(dead_code)]
 mod tests {
     use super::*;
-    use Piece as P;
 
-    fn make_game(board: Board, computer_first: bool) -> Game {
-        use Player as Pl;
-
-        let first = if computer_first {
-            Pl::Computer
-        } else {
-            Pl::Human
-        };
+    fn make_game(board: Board) -> Game {
         Game {
             board,
-            first,
+            first: Player::Computer,
             cache: Cache::new(),
         }
     }
 
     #[test]
     fn winner_one() {
-        let game = make_game(
-            Board([
-                [P::Cross, P::Circle, P::Blank],
-                [P::Blank, P::Circle, P::Blank],
-                [P::Cross, P::Circle, P::Cross],
-            ]),
-            false,
-        );
+        let game = make_game(Board::from(
+            r#"
+            X|O| 
+             |O| 
+            X|O|X"#,
+        ));
         let winner = game.winner();
-        assert_eq!(winner, Some(Player::Computer));
+        assert_eq!(winner, Some(Player::Human));
     }
     #[test]
     fn winner_two() {
-        let game = make_game(
-            Board([
-                [P::Cross, P::Circle, P::Cross],
-                [P::Cross, P::Cross, P::Circle],
-                [P::Circle, P::Blank, P::Circle],
-            ]),
-            true,
-        );
+        let game = make_game(Board::from(
+            r#"
+            X|O|X
+            X|X|O
+            O| |O"#,
+        ));
         let winner = game.winner();
         assert_eq!(winner, None);
     }
     #[test]
     fn make_best_move() {
-        let boards: [(Board, Coord); 2] = [
+        let boards: [(&str, Coord); 2] = [
             (
-                Board([
-                    [P::Cross, P::Circle, P::Cross],
-                    [P::Blank, P::Blank, P::Blank],
-                    [P::Blank, P::Blank, P::Circle],
-                ]),
+                r#"
+            X|O|X
+             | | 
+             | |O"#,
                 (2, 0),
             ),
             (
-                Board([
-                    [P::Cross, P::Circle, P::Cross],
-                    [P::Cross, P::Blank, P::Circle],
-                    [P::Circle, P::Cross, P::Circle],
-                ]),
+                r#"
+            X|O|X
+            X| |O
+            O|X|O"#,
                 (1, 1),
             ),
         ];
-        for (board, expected) in boards {
-            let game = make_game(board, true);
+        for (sketch, expected) in boards {
+            let game = make_game(Board::from(sketch));
             let best_move = game.computer_move();
             assert_eq!(best_move, Some(expected));
         }

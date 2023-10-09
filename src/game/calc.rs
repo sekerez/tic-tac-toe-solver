@@ -55,31 +55,36 @@ impl Cache {
 
 #[allow(dead_code)]
 mod tests {
-    use super::Piece as P;
     use super::*;
 
-    const ROTATIONS: [Board; 4] = [
-        Board([
-            [P::Cross, P::Blank, P::Blank],
-            [P::Blank, P::Blank, P::Blank],
-            [P::Blank, P::Blank, P::Blank],
-        ]),
-        Board([
-            [P::Blank, P::Blank, P::Cross],
-            [P::Blank, P::Blank, P::Blank],
-            [P::Blank, P::Blank, P::Blank],
-        ]),
-        Board([
-            [P::Blank, P::Blank, P::Blank],
-            [P::Blank, P::Blank, P::Blank],
-            [P::Blank, P::Blank, P::Cross],
-        ]),
-        Board([
-            [P::Blank, P::Blank, P::Blank],
-            [P::Blank, P::Blank, P::Blank],
-            [P::Cross, P::Blank, P::Blank],
-        ]),
-    ];
+    fn default_rotations() -> [Board; 4] {
+        [
+            Board::from(
+                r#"
+            X| | 
+             | | 
+             | | "#,
+            ),
+            Board::from(
+                r#"
+             | |X
+             | | 
+             | | "#,
+            ),
+            Board::from(
+                r#"
+             | | 
+             | | 
+             | |X"#,
+            ),
+            Board::from(
+                r#"
+             | | 
+             | | 
+            X| | "#,
+            ),
+        ]
+    }
 
     #[test]
     fn cached_result_is_rotated() {
@@ -99,7 +104,7 @@ mod tests {
         assert_eq!(board.rotate_min(), (0, 0));
         board.place((0, 0), Piece::Cross).unwrap();
         assert_eq!(board.rotate_min(), (0, 2));
-        for (&expected, times) in ROTATIONS.iter().zip(0..4) {
+        for (&expected, times) in default_rotations().iter().zip(0..4) {
             assert_eq!(board.right_rotate(times), expected)
         }
     }
@@ -107,9 +112,10 @@ mod tests {
     #[test]
     fn rerotate() {
         fn test_rotation(expected_results: [(usize, usize); 4]) {
+            let rotations = default_rotations();
             let mut cache = Cache::new();
-            cache.add(&ROTATIONS[0], (expected_results[0], Outcome::Win));
-            for (&rotation, expected) in ROTATIONS.iter().zip(expected_results) {
+            cache.add(&rotations[0], (expected_results[0], Outcome::Win));
+            for (&rotation, expected) in rotations.iter().zip(expected_results) {
                 assert_eq!(cache.check(rotation), Some((expected, Outcome::Win)));
             }
         }

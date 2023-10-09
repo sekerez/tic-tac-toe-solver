@@ -1,4 +1,5 @@
 use anyhow::Result;
+use itertools::iproduct;
 
 use std::fmt;
 use strum_macros;
@@ -39,13 +40,13 @@ impl fmt::Display for Piece {
         write!(f, "{}", symbol)
     }
 }
-impl From<String> for Piece {
-    fn from(rep: String) -> Self {
+impl From<&str> for Piece {
+    fn from(rep: &str) -> Self {
         use Piece as P;
-        match &rep[..] {
+        match rep {
             "X" => P::Cross,
             "O" => P::Circle,
-            " " => P::Blank,
+            " " | "" => P::Blank,
             _ => panic!("{rep} is invalid as a piece representation."),
         }
     }
@@ -121,6 +122,26 @@ impl fmt::Display for Board {
             .collect::<Vec<_>>()
             .join("\n");
         write!(f, "{}\n", cells)
+    }
+}
+impl From<&str> for Board {
+    fn from(s: &str) -> Self {
+        let pieces: Vec<Vec<Piece>> = s
+            .trim()
+            .split("\n")
+            .map(|row| {
+                row.trim()
+                    .split("|")
+                    .map(|symbol| Piece::from(symbol))
+                    .collect()
+            })
+            .collect();
+
+        let mut board = Board::new();
+        for (i, j) in iproduct!(0..3, 0..3) {
+            board.set((i, j), pieces[i][j])
+        }
+        board
     }
 }
 
